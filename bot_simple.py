@@ -7,7 +7,7 @@ def main(argv):
 	period = 10
 	pair = "ETH_BTC"
 	prices = []
-	maxTransDiff = 9999999
+	# maxTransDiff = 9999999
 	currentMovingAverage = 0
 	lengthOfMA = 0
 	historicalData = False
@@ -21,7 +21,7 @@ def main(argv):
 	selling = []
 
 	try:
-		opts, args = getopt.getopt(argv,"h:p:c:n:q:d:",["period=","currency=","points="])
+		opts, args = getopt.getopt(argv, "h:p:c:n:q:d:", ["period=", "currency=", "points="])
 	except getopt.GetoptError:
 		print('bot_simple.py -p <period length> -c <currency pair> -n <period of moving average> -q <quantity of the indicated currency> -d <max difference between sell and buy transactions>')
 		sys.exit(2)
@@ -31,19 +31,19 @@ def main(argv):
 			print('bot_simple.py -p <period length> -c <currency pair> -n <period of moving average> -q <quantity of the indicated currency> -d <max difference between sell and buy transactions>')
 			sys.exit()
 		elif opt in ("-p", "--period"):
-			#if (int(arg) in [300,900,1800,7200,14400,86400]):
-			period = arg
-			#else:
-			#	print('Poloniex requires periods in 300,900,1800,7200,14400, or 86400 second increments')
-			#	sys.exit(2)
+			if int(arg) in [60, 300, 900, 1800, 7200, 14400, 86400]:
+				period = arg
+			else:
+				print('Poloniex requires periods in 60,300,900,1800,7200,14400, or 86400 second increments')
+				sys.exit(2)
 		elif opt in ("-c", "--currency"):
 			pair = arg
 		elif opt in ("-n", "--points"):
 			lengthOfMA = int(arg)
 		elif opt in ("-q", "--quantity"):
 			quant = float(arg)
-		elif opt in ("-d"):
-			maxTransDiff = int(arg)
+		#elif opt in ("-d"):
+		#	maxTransDiff = int(arg)
 
 
 	conn = poloniex('key goes here','key goes here') # To try without keys substitute by: conn = poloniex()
@@ -67,22 +67,22 @@ def main(argv):
 		if (len(prices) > 0):
 			currentMovingAverage = sum(prices) / float(len(prices))
 			previousPrice = prices[-1]
-			
+
 			# Trade placing decisions
 			if (not tradePlaced):
-				if (abs(len(buying)-len(selling)) < maxTransDiff): # TODO: Revisar este sinsentido (Bloquea compra y venta)
-					if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) ): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
-						print("SELL ORDER")
-						selling.append([pair, float(lastPairPrice),quant])
-						# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
-						tradePlaced = True
-						typeOfTrade = "short"
-					elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
-						print("BUY ORDER")
-						buying.append([pair,float(lastPairPrice),quant])
-						# orderNumber = conn.buy(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
-						tradePlaced = True
-						typeOfTrade = "long"
+				#if (abs(len(buying)-len(selling)) < maxTransDiff): TODO: Revisar este sinsentido (Bloquea compra y venta)
+				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
+					print("SELL ORDER")
+					selling.append([pair, float(lastPairPrice), quant])
+					# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+					tradePlaced = True
+					typeOfTrade = "short"
+				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
+					print("BUY ORDER")
+					buying.append([pair, float(lastPairPrice), quant])
+					# orderNumber = conn.buy(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+					tradePlaced = True
+					typeOfTrade = "long"
 			elif (typeOfTrade == "short"):
 				if ( float(lastPairPrice) < currentMovingAverage ):
 					print("EXIT TRADE")
@@ -106,7 +106,7 @@ def main(argv):
 			totalSold += x[1]*x[2]
 		for x in buying:
 			totalBought += x[1]*x[2]
-		
+
 
 		print("%s Period: %ss %s: %s Moving Average: %s" % (dataDate,period,pair,lastPairPrice,currentMovingAverage))
 		print("Sell orders - " + str(len(selling)))
@@ -115,7 +115,7 @@ def main(argv):
 		print(buying)
 
 		print("Bought: " + str(totalBought) + " - Sold: " + str(totalSold))
-		
+
 		print("After max fees -- Bought: " + str(totalBought*0.99855) + " - Sold: " + str(totalSold*0.99855))
 
 		if (len(selling) > 0):
@@ -123,7 +123,7 @@ def main(argv):
 			if (len(buying) > 0):
 				avgBuys = sum(x[1] for x in buying)/len(buying)
 				total = avgSells / avgBuys
-				print("Total earns: %5.8f" % (total-1))
+				print("Total average earns: %5.8f" % (total-1.001))
 
 		prices.append(float(lastPairPrice))
 		prices = prices[-(lengthOfMA):]
