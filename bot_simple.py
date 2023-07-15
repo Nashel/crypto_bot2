@@ -31,11 +31,11 @@ def main(argv):
 			print('bot_simple.py -p <period length> -c <currency pair> -n <period of moving average> -q <quantity of the indicated currency> -d <max difference between sell and buy transactions>')
 			sys.exit()
 		elif opt in ("-p", "--period"):
-			if (int(arg) in [300,900,1800,7200,14400,86400]):
-				period = arg
-			else:
-				print('Poloniex requires periods in 300,900,1800,7200,14400, or 86400 second increments')
-				sys.exit(2)
+			#if (int(arg) in [300,900,1800,7200,14400,86400]):
+			period = arg
+			#else:
+			#	print('Poloniex requires periods in 300,900,1800,7200,14400, or 86400 second increments')
+			#	sys.exit(2)
 		elif opt in ("-c", "--currency"):
 			pair = arg
 		elif opt in ("-n", "--points"):
@@ -70,8 +70,8 @@ def main(argv):
 			
 			# Trade placing decisions
 			if (not tradePlaced):
-				if (abs(len(buying)-len(selling)) < maxTransDiff):
-					if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) ):
+				if (abs(len(buying)-len(selling)) < maxTransDiff): # TODO: Revisar este sinsentido (Bloquea compra y venta)
+					if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) ): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
 						print("SELL ORDER")
 						selling.append([pair, float(lastPairPrice),quant])
 						# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
