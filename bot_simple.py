@@ -71,18 +71,32 @@ def main(argv):
 			# Trade placing decisions
 			if (not tradePlaced):
 				#if (abs(len(buying)-len(selling)) < maxTransDiff): TODO: Revisar este sinsentido (Bloquea compra y venta)
-				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
-					print("SELL ORDER")
-					selling.append([pair, float(lastPairPrice), quant])
-					# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
-					tradePlaced = True
-					typeOfTrade = "short"
-				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
-					print("BUY ORDER")
-					buying.append([pair, float(lastPairPrice), quant])
-					# orderNumber = conn.buy(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
-					tradePlaced = True
-					typeOfTrade = "long"
+				if len(buying)>0:
+					if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) and (float(lastPairPrice)*1.001 > buying[0])): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
+						print("SELL ORDER")
+						selling.append([pair, float(lastPairPrice), quant])
+						# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+						tradePlaced = True
+						typeOfTrade = "short"
+					elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
+						print("BUY ORDER")
+						buying.append([pair, float(lastPairPrice), quant])
+						# orderNumber = conn.buy(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+						tradePlaced = True
+						typeOfTrade = "long"
+				else:
+					if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)): # TODO: Revisar dependencia con el currentMovingAverage (Quizá vender si la media de compras es mas baja, teniendo en cuenta fees?)
+						print("SELL ORDER")
+						selling.append([pair, float(lastPairPrice), quant])
+						# orderNumber = conn.sell(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+						tradePlaced = True
+						typeOfTrade = "short"
+					elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
+						print("BUY ORDER")
+						buying.append([pair, float(lastPairPrice), quant])
+						# orderNumber = conn.buy(pair,float(lastPairPrice),quant) # To try without keys substitute by: orderNumber = 0
+						tradePlaced = True
+						typeOfTrade = "long"
 			elif (typeOfTrade == "short"):
 				if ( float(lastPairPrice) < currentMovingAverage ):
 					print("EXIT TRADE")
