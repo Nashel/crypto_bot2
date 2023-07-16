@@ -10,6 +10,7 @@ def main(argv):
 	# maxTransDiff = 9999999
 	currentMovingAverage = 0
 	lengthOfMA = 0
+	failsafe = 0.003
 	historicalData = False
 	tradePlaced = False
 	typeOfTrade = False
@@ -42,6 +43,8 @@ def main(argv):
 			lengthOfMA = int(arg)
 		elif opt in ("-q", "--quantity"):
 			quant = float(arg)
+		elif opt in ("-fs", "--failsafe"):
+			failsafe = float(arg)
 		#elif opt in ("-d"):
 		#	maxTransDiff = int(arg)
 
@@ -86,13 +89,13 @@ def main(argv):
 			elif (typeOfTrade == "short"):
 				if ( float(lastPairPrice) < currentMovingAverage ):
 					print("EXIT TRADE")
-					# conn.cancel(pair,orderNumber) # To try without keys delete this line
+					#res = conn.cancel(pair, orderNumber) # To try without keys delete this line
 					tradePlaced = False
 					typeOfTrade = False
 			elif (typeOfTrade == "long"):
 				if ( float(lastPairPrice) > currentMovingAverage ):
 					print("EXIT TRADE")
-					# conn.cancel(pair,orderNumber) # To try without keys delete this line
+					#res = conn.cancel(pair, orderNumber) # To try without keys delete this line
 					tradePlaced = False
 					typeOfTrade = False
 		else:
@@ -116,14 +119,16 @@ def main(argv):
 
 		print("Bought: " + str(totalBought) + " - Sold: " + str(totalSold))
 
-		print("After max fees -- Bought: " + str(totalBought*0.99855) + " - Sold: " + str(totalSold*0.99855))
-
 		if (len(selling) > 0):
 			avgSells = sum(x[1] for x in selling)/len(selling)
 			if (len(buying) > 0):
 				avgBuys = sum(x[1] for x in buying)/len(buying)
 				total = avgSells / avgBuys
-				print("Total average earns: %5.8f" % (total-1.001))
+				print("Total average earns: %5.8f" % (total-1))
+				if (total - 1) < -failsafe:
+					print('This sesion loses are higher than %5.5f percent. Failsafe activated' % failsafe)
+					sys.exit(2)
+
 
 		prices.append(float(lastPairPrice))
 		prices = prices[-(lengthOfMA):]
