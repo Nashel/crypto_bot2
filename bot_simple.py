@@ -2,6 +2,7 @@ import time
 import os
 import sys, getopt
 import datetime
+import uuid
 from polosdk import RestClient
 from wrapper import poloniex
 
@@ -22,6 +23,7 @@ def main(argv):
 	typeOfTrade = False
 	dataDate = datetime
 	orderNumber = ""
+	generatedUuid = ""
 	interval = ""
 	total = 0
 	quant = 0.0
@@ -94,36 +96,39 @@ def main(argv):
 	while True:
 		currentValues = client.markets().get_ticker24h(pair)
 		lastPairPrice = currentValues['close']
+		# response = client.accounts().get_fee_info()
 		dataDate = datetime.datetime.now()
 
 		if (len(prices) > 0):
 			currentMovingAverage = sum(prices) / float(len(prices))
 			previousPrice = prices[-1]
+			quant2trade = float(lastPairPrice)/quant
 
 			# Trade placing decisions
 			if (not tradePlaced):
+				generatedUuid = str(uuid.uuid4())
 				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)):
 					print("SELL ORDER")
-					selling.append([pair, float(lastPairPrice), quant])
-					#  # Place sell order # orderNumber = conn.sell(pair,float(lastPairPrice),quant) TODO: UPDATE
+					selling.append([pair, float(lastPairPrice), quant2trade])
+					# response = client.orders().create(price=float(lastPairPrice), quantity=quant2trade, side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # Place sell order TODO: try market orders
 					tradePlaced = True
 					typeOfTrade = "short"
 				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
 					print("BUY ORDER")
-					buying.append([pair, float(lastPairPrice), quant])
-					# orderNumber = conn.buy(pair,float(lastPairPrice),quant) TODO: UPDATE
+					buying.append([pair, float(lastPairPrice), quant2trade])
+					# response = client.orders().create(price=float(lastPairPrice), quantity=quant2trade, side='BUY', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
 					tradePlaced = True
 					typeOfTrade = "long"
 			elif (typeOfTrade == "short"):
 				if ( float(lastPairPrice) < currentMovingAverage ):
 					print("EXIT TRADE")
-					#res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
+					# response = client.orders().cancel_by_id(client_order_id=generatedUuid) #res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
 					tradePlaced = False
 					typeOfTrade = False
 			elif (typeOfTrade == "long"):
 				if ( float(lastPairPrice) > currentMovingAverage ):
 					print("EXIT TRADE")
-					#res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
+					# response = client.orders().cancel_by_id(client_order_id=generatedUuid) #res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
 					tradePlaced = False
 					typeOfTrade = False
 		else:
