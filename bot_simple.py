@@ -3,12 +3,14 @@ import os
 import sys, getopt
 import datetime
 import uuid
-from polosdk import RestClient
-from wrapper import poloniex
 
-client = RestClient()
+import polosdk
+from polosdk import RestClient
+
+
 api_key = os.environ['POLO_API_KEY']
 api_secret = os.environ['POLO_API_SECRET']
+client = RestClient(api_key, api_secret)
 
 def main(argv):
 	period = 10
@@ -80,8 +82,6 @@ def main(argv):
 			failsafe = float(arg)
 
 
-	# conn = poloniex('key goes here','key goes here') # TODO: DELETE
-
 	# Prepare previous data
 	actualTime = client.get_timestamp()
 	historicalData = client.markets().get_candles(pair, interval, int(actualTime['serverTime'])-lengthOfMA*int(period)*1000, int(actualTime['serverTime']))
@@ -96,41 +96,54 @@ def main(argv):
 	while True:
 		currentValues = client.markets().get_ticker24h(pair)
 		lastPairPrice = currentValues['close']
-		# response = client.accounts().get_fee_info()
+		response = client.accounts().get_fee_info()
 		dataDate = datetime.datetime.now()
 
 		if (len(prices) > 0):
 			currentMovingAverage = sum(prices) / float(len(prices))
 			previousPrice = prices[-1]
-			quant2trade = float(lastPairPrice)/quant
 
 			# Trade placing decisions
+			if (typeOfTrade == "short"):
+				if ( float(lastPairPrice) < currentMovingAverage ):
+					try:
+						print("EXIT TRADE")
+						tradePlaced = False
+						typeOfTrade = False
+						response = client.orders().cancel_by_id(client_order_id=generatedUuid)
+						selling.pop()
+					except polosdk.rest.request.RequestError as e:
+						print(f"CAN'T CANCEL ORDER: {e}")
+			elif (typeOfTrade == "long"):
+				if ( float(lastPairPrice) > currentMovingAverage ):
+					try:
+						print("EXIT TRADE")
+						tradePlaced = False
+						typeOfTrade = False
+						response = client.orders().cancel_by_id(client_order_id=generatedUuid)
+						buying.pop()
+					except polosdk.rest.request.RequestError as e:
+						print(f"CAN'T CANCEL ORDER: {e}")
 			if (not tradePlaced):
 				generatedUuid = str(uuid.uuid4())
 				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)):
-					print("SELL ORDER")
-					selling.append([pair, float(lastPairPrice), quant2trade])
-					# response = client.orders().create(price=float(lastPairPrice), quantity=quant2trade, side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # Place sell order TODO: try market orders
-					tradePlaced = True
-					typeOfTrade = "short"
+					try:
+						response = client.orders().create(price=float(lastPairPrice), quantity=float("{:.6f}".format(quant*(1-currentValues['takerRate']))), side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
+						selling.append([pair, float(lastPairPrice), float("{:.6f}".format(quant*(1-currentValues['takerRate'])))])
+						print("SELL ORDER")
+						tradePlaced = True
+						typeOfTrade = "short"
+					except polosdk.rest.request.RequestError as e:
+						print(f"COULDN'T SELL: {e}")
 				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
-					print("BUY ORDER")
-					buying.append([pair, float(lastPairPrice), quant2trade])
-					# response = client.orders().create(price=float(lastPairPrice), quantity=quant2trade, side='BUY', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
-					tradePlaced = True
-					typeOfTrade = "long"
-			elif (typeOfTrade == "short"):
-				if ( float(lastPairPrice) < currentMovingAverage ):
-					print("EXIT TRADE")
-					# response = client.orders().cancel_by_id(client_order_id=generatedUuid) #res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
-					tradePlaced = False
-					typeOfTrade = False
-			elif (typeOfTrade == "long"):
-				if ( float(lastPairPrice) > currentMovingAverage ):
-					print("EXIT TRADE")
-					# response = client.orders().cancel_by_id(client_order_id=generatedUuid) #res = conn.cancel(pair, orderNumber) TODO: UPDATE & substract the canceled order from the list
-					tradePlaced = False
-					typeOfTrade = False
+					try:
+						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='BUY', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
+						buying.append([pair, float(lastPairPrice), quant])
+						print("BUY ORDER")
+						tradePlaced = True
+						typeOfTrade = "long"
+					except polosdk.rest.request.RequestError as e:
+						print(f"COULDN'T BUY: {e}")
 		else:
 			previousPrice = 0
 
@@ -159,7 +172,7 @@ def main(argv):
 				print("Total average earns: %5.8f" % (total-1))
 				if (total - 1) < -failsafe:
 					print('This sesion loses are higher than %5.5f percent. Failsafe activated' % failsafe)
-					#res = conn.cancel(pair, orderNumber)
+					response = client.orders().cancel(symbol=pair)
 					sys.exit(2)
 
 
