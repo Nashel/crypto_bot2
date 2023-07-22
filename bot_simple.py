@@ -128,8 +128,8 @@ def main(argv):
 				generatedUuid = str(uuid.uuid4())
 				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)):
 					try:
-						response = client.orders().create(price=float(lastPairPrice), quantity=float("{:.6f}".format(quant*(1-currentValues['takerRate']))), side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
-						selling.append([pair, float(lastPairPrice), float("{:.6f}".format(quant*(1-currentValues['takerRate'])))])
+						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
+						selling.append([pair, float(lastPairPrice), quant])
 						print("SELL ORDER")
 						tradePlaced = True
 						typeOfTrade = "short"
