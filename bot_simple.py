@@ -3,6 +3,7 @@ import os
 import sys, getopt
 import datetime
 import uuid
+import regex
 
 import polosdk
 from polosdk import RestClient
@@ -28,12 +29,14 @@ def main(argv):
 	generatedUuid = ""
 	interval = ""
 	total = 0
+	maxBuy = 0.0
 	quant = 0.0
+	minimum = 0.0
 	buying = []
 	selling = []
 
 	try:
-		opts, args = getopt.getopt(argv, "h:p:c:n:q:s:", ["period=", "currency=", "points="])
+		opts, args = getopt.getopt(argv, "h:p:c:n:q:s:m:l:", ["period=", "currency=", "points="])
 	except getopt.GetoptError:
 		print('bot_simple.py -p <period length> -c <currency pair> -n <period of moving average> -q <quantity of the indicated currency> -s <failsafe>')
 		sys.exit(2)
@@ -80,6 +83,10 @@ def main(argv):
 			quant = float(arg)
 		elif opt in ("-s", "--failsafe"):
 			failsafe = float(arg)
+		elif opt in ("-m", "--maxMultiplier"):
+			maxBuy = float(arg)
+		elif opt in ("-l", "--minimum"):
+			minimum = float(arg)
 
 
 	# Prepare previous data
@@ -96,7 +103,10 @@ def main(argv):
 	while True:
 		currentValues = client.markets().get_ticker24h(pair)
 		lastPairPrice = currentValues['close']
-		response = client.accounts().get_fee_info()
+		# response = client.accounts().get_fee_info()
+		balances = client.subaccounts().get_balances()
+		spotAccount = next((item for item in balances if item["accountType"] == "SPOT" and item["isPrimary"] == "true"), None)
+		actualCurrency = next((item for item in spotAccount["balances"] if item["currency"] == regex.search(r"^(.*?)_", pair).group(1)), None)
 		dataDate = datetime.datetime.now()
 
 		if (len(prices) > 0):
@@ -126,19 +136,19 @@ def main(argv):
 						print(f"CAN'T CANCEL ORDER: {e}")
 			if (not tradePlaced):
 				generatedUuid = str(uuid.uuid4())
-				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice)):
+				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) and float(actualCurrency["available"]) > float(minimum)):
 					try:
 						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
-						selling.append([pair, float(lastPairPrice), quant])
+						selling.append([pair, float(lastPairPrice), quant, dataDate])
 						print("SELL ORDER")
 						tradePlaced = True
 						typeOfTrade = "short"
 					except polosdk.rest.request.RequestError as e:
 						print(f"COULDN'T SELL: {e}")
-				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) ):
+				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) and float(actualCurrency["available"]) < float(maxBuy)):
 					try:
 						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='BUY', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
-						buying.append([pair, float(lastPairPrice), quant])
+						buying.append([pair, float(lastPairPrice), quant, dataDate])
 						print("BUY ORDER")
 						tradePlaced = True
 						typeOfTrade = "long"
@@ -151,9 +161,15 @@ def main(argv):
 		totalSold = 0
 		totalBought = 0
 		for x in selling:
-			totalSold += x[1]*x[2]
+			if x[3] >= dataDate - datetime.timedelta(hours=12):
+				totalSold += x[1]*x[2]
+			else:
+				selling.remove(x)
 		for x in buying:
-			totalBought += x[1]*x[2]
+			if x[3] >= dataDate - datetime.timedelta(hours=12):
+				totalBought += x[1]*x[2]
+			else:
+				buying.remove(x)
 
 
 		print("%s Period: %ss %s: %s Moving Average: %s" % (dataDate,period,pair,lastPairPrice,currentMovingAverage))
