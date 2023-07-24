@@ -32,6 +32,7 @@ def main(argv):
 	maxBuy = 0.0
 	quant = 0.0
 	minimum = 0.0
+	i=0
 	buying = []
 	selling = []
 
@@ -100,22 +101,28 @@ def main(argv):
 		prices = prices[-(lengthOfMA):]
 		currentMovingAverage = sum(prices) / float(len(prices))
 
+	previousPrice = prices[-1]
+
 	while True:
 		currentValues = client.markets().get_ticker24h(pair)
 		lastPairPrice = currentValues['close']
-		# response = client.accounts().get_fee_info()
+		fees = client.accounts().get_fee_info()
 		balances = client.subaccounts().get_balances()
 		spotAccount = next((item for item in balances if item["accountType"] == "SPOT" and item["isPrimary"] == "true"), None)
 		actualCurrency = next((item for item in spotAccount["balances"] if item["currency"] == regex.search(r"^(.*?)_", pair).group(1)), None)
+
+		if actualCurrency is None:
+			actualCurrency = {"available": "0.0"}
+
 		dataDate = datetime.datetime.now()
 
 		if (len(prices) > 0):
 			currentMovingAverage = sum(prices) / float(len(prices))
-			previousPrice = prices[-1]
+			#previousPrice = prices[-1]
 
 			# Trade placing decisions
 			if (typeOfTrade == "short"):
-				if ( float(lastPairPrice) < currentMovingAverage ):
+				if ( float(lastPairPrice) < currentMovingAverage*(1-float(fees["takerRate"])) ):
 					try:
 						print("EXIT TRADE")
 						tradePlaced = False
@@ -125,7 +132,7 @@ def main(argv):
 					except polosdk.rest.request.RequestError as e:
 						print(f"CAN'T CANCEL ORDER: {e}")
 			elif (typeOfTrade == "long"):
-				if ( float(lastPairPrice) > currentMovingAverage ):
+				if ( float(lastPairPrice) > currentMovingAverage*(1+float(fees["takerRate"])) ):
 					try:
 						print("EXIT TRADE")
 						tradePlaced = False
@@ -136,7 +143,7 @@ def main(argv):
 						print(f"CAN'T CANCEL ORDER: {e}")
 			if (not tradePlaced):
 				generatedUuid = str(uuid.uuid4())
-				if ( (float(lastPairPrice) > currentMovingAverage) and (float(lastPairPrice) < previousPrice) and float(actualCurrency["available"]) > float(minimum)):
+				if ( float(lastPairPrice) > currentMovingAverage*(1+float(fees["takerRate"])) and float(actualCurrency["available"]) > float(minimum)) and (float(lastPairPrice) < previousPrice):
 					try:
 						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='SELL', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
 						selling.append([pair, float(lastPairPrice), quant, dataDate])
@@ -145,7 +152,7 @@ def main(argv):
 						typeOfTrade = "short"
 					except polosdk.rest.request.RequestError as e:
 						print(f"COULDN'T SELL: {e}")
-				elif ( (float(lastPairPrice) < currentMovingAverage) and (float(lastPairPrice) > previousPrice) and float(actualCurrency["available"]) < float(maxBuy)):
+				elif ( float(lastPairPrice) < currentMovingAverage*(1-float(fees["takerRate"])) and float(actualCurrency["available"]) < float(maxBuy) and (float(lastPairPrice) > previousPrice)):
 					try:
 						response = client.orders().create(price=float(lastPairPrice), quantity=quant, side='BUY', symbol=pair, type='LIMIT', client_order_id=generatedUuid) # TODO: try market orders
 						buying.append([pair, float(lastPairPrice), quant, dataDate])
@@ -192,10 +199,14 @@ def main(argv):
 					sys.exit(2)
 
 
-		prices.append(float(lastPairPrice))
-		prices = prices[-(lengthOfMA):]
+		if i >= 10:
+			prices.append(float(lastPairPrice))
+			prices = prices[-(lengthOfMA):]
+			i = 0
 
-		time.sleep(int(period))
+		previousPrice = float(lastPairPrice)
+		i = i + 1
+		time.sleep(int(period)/10)
 
 
 if __name__ == "__main__":
